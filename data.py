@@ -1,26 +1,23 @@
-import tensorflow_datasets as tfds
-import tensorflow as tf
+import jax
+import jax.numpy as jnp
+from jax import random
 
-def load_cifar10(batch_size=64):
-    # 禁用GPU
-    tf.config.set_visible_devices([], 'GPU')
+def generate_synthetic_data():
+    key = random.PRNGKey(0)
+    train_key, val_key = random.split(key)
     
-    # 加载CIFAR-10数据集
-    train_ds, test_ds = tfds.load(
-        'cifar10', 
-        split=['train', 'test'], 
-        as_supervised=True,
-        shuffle_files=True
-    )
+    train_x = random.normal(train_key, (60000, 32, 32, 3))
+    train_y = random.randint(train_key, (60000,), 0, 10)
     
-    # 预处理函数
-    def preprocess(image, label):
-        image = tf.cast(image, tf.float32) / 255.0
-        image = (image - 0.5) * 2.0
-        return image, label
+    val_x = random.normal(val_key, (10000, 32, 32, 3))
+    val_y = random.randint(val_key, (10000,), 0, 10)
     
-    # 应用预处理并批处理
-    train_ds = train_ds.map(preprocess, num_parallel_calls=tf.data.AUTOTUNE).batch(batch_size)
-    test_ds = test_ds.map(preprocess, num_parallel_calls=tf.data.AUTOTUNE).batch(batch_size)
-    
-    return train_ds, test_ds
+    return (train_x, train_y), (val_x, val_y)
+
+def create_data_loader(data, batch_size=32):
+    x, y = data
+    num_batches = len(x) // batch_size
+    for i in range(num_batches):
+        start = i * batch_size
+        end = start + batch_size
+        yield x[start:end], y[start:end]

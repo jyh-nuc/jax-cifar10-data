@@ -1,23 +1,28 @@
 import jax
 import jax.numpy as jnp
-from jax import random
 
-def generate_synthetic_data():
-    key = random.PRNGKey(0)
-    train_key, val_key = random.split(key)
-    
-    train_x = random.normal(train_key, (60000, 32, 32, 3))
-    train_y = random.randint(train_key, (60000,), 0, 10)
-    
-    val_x = random.normal(val_key, (10000, 32, 32, 3))
-    val_y = random.randint(val_key, (10000,), 0, 10)
-    
-    return (train_x, train_y), (val_x, val_y)
+def generate_synthetic_data(train: bool = True):
+    num_samples = 60000 if train else 10000
+    key = jax.random.PRNGKey(42)
+    images = jax.random.uniform(key, shape=(num_samples, 32, 32, 3))
+    labels = jax.random.randint(key, shape=(num_samples,), minval=0, maxval=10)
+    return (images, labels)  # 严格返回二元组
 
-def create_data_loader(data, batch_size=32):
-    x, y = data
-    num_batches = len(x) // batch_size
-    for i in range(num_batches):
-        start = i * batch_size
-        end = start + batch_size
-        yield x[start:end], y[start:end]
+def create_data_loader(data: tuple, batch_size: int):
+    images, labels = data
+    dataset = list(zip(images, labels))
+    for i in range(0, len(dataset), batch_size):
+        yield dataset[i:i+batch_size]
+
+def evaluate(state, data_loader):
+    correct = 0
+    total = 0
+    for batch in data_loader:
+        x, y = zip(*batch)
+        x = jnp.array(x)
+        y = jnp.array(y)
+        logits = state.apply_fn({'params': state.params}, x)
+        preds = jnp.argmax(logits, axis=1)
+        correct += jnp.sum(preds == y)
+        total += len(y)
+    return correct / total
